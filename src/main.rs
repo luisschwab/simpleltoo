@@ -7,6 +7,8 @@ mod compile;
 mod error;
 mod esplora;
 mod faucet;
+mod sign;
+mod transaction;
 
 fn main() {
     tracing_subscriber::fmt()
