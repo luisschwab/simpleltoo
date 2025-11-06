@@ -13,7 +13,7 @@ base64 = "0.22.1"
 bitreq = { version = "0.2.0", features = ["async-https"] }
 elements = "=0.25.2"
 esplora-client = { version = "0.12.1", features = ["async-https-rustls", "tokio"] }
-hal-simplicity = "0.1.0"
+hal-simplicity = { git = "https://github.com/apoelstra/hal-simplicity", branch = "2025-10/pset-signer" }
 lwk_wollet = "0.12.0"
 regex = "1.12.2"
 simplicity = "0.4.2"
