@@ -1,5 +1,6 @@
 use std::fmt::format;
 
+use elements::Address;
 use elements::hashes::{Hash, sha256};
 use lwk_wollet::secp256k1::SecretKey;
 use lwk_wollet::secp256k1::{self, XOnlyPublicKey};
@@ -38,6 +39,13 @@ pub(crate) fn create_new_commitment_script(
         .map_err(simplicityhl::error::Error::CannotCompile)?;
 
     Ok(compiled)
+}
+
+pub(crate) fn derive_address(program: &CompiledProgram) -> Address {
+    let commited = program.commit();
+    let script = commited.to_vec_without_witness();
+
+    let addresses = hal_simplicity::address::Addresses::from_script(&script, blinder, network);
 }
 
 fn populate_template(
