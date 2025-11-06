@@ -14,4 +14,10 @@ pub(crate) enum Error {
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("Txid parsing from faucet's HTML error")]
+    HtmlParsing,
+
+    #[error("Hex parsing error: {0}")]
+    HexParsing(#[from] elements::bitcoin::hex::HexToArrayError),
 }
