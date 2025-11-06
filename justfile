@@ -2,6 +2,7 @@ alias b := build
 alias c := check
 alias d := delete
 alias f := fmt
+alias t := test
 
 _default:
     @just --list
@@ -23,6 +24,9 @@ delete item="examples":
 # Format code
 fmt:
     cargo +nightly fmt
+
+test:
+    cargo test
 
 _delete-target:
     rm -rf target/
