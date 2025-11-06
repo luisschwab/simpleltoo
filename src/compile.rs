@@ -1,8 +1,13 @@
 use std::fmt::format;
 
+use base64::{display::Base64Display, engine::general_purpose::STANDARD};
 use elements::hashes::{Hash, sha256};
-use lwk_wollet::secp256k1::SecretKey;
-use lwk_wollet::secp256k1::{self, XOnlyPublicKey};
+use elements::{Address, AddressParams, Script};
+use hal_simplicity::hal_simplicity::Program;
+use hal_simplicity::simplicity::Cmr;
+use hal_simplicity::{Network, hal_simplicity::elements_address};
+use lwk_wollet::secp256k1::{self, SecretKey, XOnlyPublicKey};
+use simplicityhl::simplicity::jet;
 use simplicityhl::{Arguments, CompiledProgram};
 
 use crate::error::Error;
@@ -38,6 +43,22 @@ pub(crate) fn create_new_commitment_script(
         .map_err(simplicityhl::error::Error::CannotCompile)?;
 
     Ok(compiled)
+}
+
+pub(crate) fn derive_address(program: &CompiledProgram, is_mainnet: bool) -> Address {
+    let commited = program.commit();
+
+    let script_bytes = Script::from(commited.to_vec_without_witness());
+
+    let script_base64 = Base64Display::new(&script_bytes.to_bytes(), &STANDARD).to_string();
+
+    let program = Program::<jet::Elements>::from_str(&script_base64, None).unwrap();
+
+    if is_mainnet {
+        elements_address(program.cmr(), &AddressParams::LIQUID)
+    } else {
+        elements_address(program.cmr(), &AddressParams::LIQUID_TESTNET)
+    }
 }
 
 fn populate_template(

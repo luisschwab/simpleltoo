@@ -9,10 +9,13 @@ autors = [
 licence = "MIT"
 
 [dependencies]
+base64 = "0.22.1"
 bitreq = { version = "0.2.0", features = ["async-https"] }
 elements = "=0.25.2"
 esplora-client = { version = "0.12.1", features = ["async-https-rustls", "tokio"] }
+hal-simplicity = "0.1.0"
 lwk_wollet = "0.12.0"
+simplicity = "0.4.2"
 simplicityhl = "0.2.0"
 thiserror = "2.0.17"
 tokio = { version = "1.48.0", features = ["rt", "macros"] }
