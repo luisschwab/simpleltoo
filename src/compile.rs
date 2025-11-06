@@ -1,26 +1,30 @@
 use std::fmt::format;
 
 use base64::{display::Base64Display, engine::general_purpose::STANDARD};
-use elements::hashes::{Hash, sha256};
-use elements::{Address, AddressParams, Script};
-use hal_simplicity::hal_simplicity::Program;
-use hal_simplicity::simplicity::Cmr;
-use hal_simplicity::{Network, hal_simplicity::elements_address};
+use elements::{
+    hashes::{Hash, sha256},
+    secp256k1_zkp::SECP256K1,
+    {Address, AddressParams, Script},
+};
+use hal_simplicity::{
+    Network,
+    hal_simplicity::{Program, elements_address},
+    simplicity::Cmr,
+};
 use lwk_wollet::secp256k1::{self, SecretKey, XOnlyPublicKey};
-use simplicityhl::simplicity::jet;
-use simplicityhl::{Arguments, CompiledProgram};
+use simplicityhl::{Arguments, CompiledProgram, simplicity::jet};
 
 use crate::error::Error;
 
 const TEMPLATE_PATH: &str = "scripts/eltoo_commitment_template.simf";
 
-/// Placeholder identifiers in the template file
+/// Placeholder identifiers in the template file.
 const SETTLEMENT_KEY_A_PLACEHOLDER: &str = "__SETTLEMENT_KEY_A__";
 const SETTLEMENT_KEY_B_PLACEHOLDER: &str = "__SETTLEMENT_KEY_B__";
 const STATE_NUMBER_PLACEHOLDER: &str = "__NEXT_STATE_NUMBER__";
 
-pub(crate) fn create_new_commitment_script(
-    secp: &secp256k1::Secp256k1<secp256k1::All>,
+/// Build the `ELTOO` commitment script from both parties settlement [`SecretKey`]s.
+pub(crate) fn build_new_commitment_script(
     settlement_key_a: SecretKey,
     settlement_key_b: SecretKey,
     next_state: u64,
@@ -28,10 +32,10 @@ pub(crate) fn create_new_commitment_script(
     let prog_path = std::path::Path::new(TEMPLATE_PATH);
     let mut template = std::fs::read_to_string(prog_path)?;
 
-    let pub_settlement_key_a = settlement_key_a.x_only_public_key(secp);
-    let pub_settlement_key_b = settlement_key_b.x_only_public_key(secp);
+    let pub_settlement_key_a = settlement_key_a.x_only_public_key(SECP256K1);
+    let pub_settlement_key_b = settlement_key_b.x_only_public_key(SECP256K1);
 
-    // Replace the placeholder values
+    // Replace the placeholders with actual values.
     let prog_text = populate_template(
         &template,
         pub_settlement_key_a.0,
@@ -39,19 +43,19 @@ pub(crate) fn create_new_commitment_script(
         next_state,
     );
 
+    // Compile the `SimplicityHL` program from it's string.
     let compiled = CompiledProgram::new(prog_text, Arguments::default(), false)
         .map_err(simplicityhl::error::Error::CannotCompile)?;
 
     Ok(compiled)
 }
 
+/// Derive an Elements [`Address`] from a `SimplicityHL` program.
 pub(crate) fn derive_address(program: &CompiledProgram, is_mainnet: bool) -> Address {
     let commited = program.commit();
 
     let script_bytes = Script::from(commited.to_vec_without_witness());
-
     let script_base64 = Base64Display::new(&script_bytes.to_bytes(), &STANDARD).to_string();
-
     let program = Program::<jet::Elements>::from_str(&script_base64, None).unwrap();
 
     if is_mainnet {
@@ -61,6 +65,7 @@ pub(crate) fn derive_address(program: &CompiledProgram, is_mainnet: bool) -> Add
     }
 }
 
+/// Populate the ELTOO commitment template with both parties pubkeys and the state index.
 fn populate_template(
     template: &str,
     pub_key_a: XOnlyPublicKey,
@@ -73,10 +78,12 @@ fn populate_template(
         .replace(STATE_NUMBER_PLACEHOLDER, &state.to_string())
 }
 
+/// Add the `0x` prefix to an [`XOnlyPublicKey`].
 fn format_pubkey(pubkey: XOnlyPublicKey) -> String {
     format!("0x{}", pubkey)
 }
 
+/// Derive the settlement key from an update key and the state index.
 pub(crate) fn derive_settlement_key(update_key: &SecretKey, state: u64) -> SecretKey {
     use sha256::Hash;
 
@@ -104,11 +111,10 @@ mod tests {
     use lwk_wollet::secp256k1;
     use simplicityhl::CompiledProgram;
 
-    use crate::compile::{create_new_commitment_script, derive_settlement_key};
+    use super::*;
 
     #[test]
     fn test_create_new_commitment_script() {
-        let secp = secp256k1::Secp256k1::new();
         let update_key_a = SecretKey::from_slice(&[0xcd; 32]).unwrap();
         let update_key_b = SecretKey::from_slice(&[0xee; 32]).unwrap();
         let next_state = 1;
@@ -116,7 +122,6 @@ mod tests {
         let settlement_key_a = derive_settlement_key(&update_key_a, next_state);
         let settlement_key_b = derive_settlement_key(&update_key_b, next_state);
         let compiled =
-            create_new_commitment_script(&secp, settlement_key_a, settlement_key_b, next_state)
-                .unwrap();
+            build_new_commitment_script(settlement_key_a, settlement_key_b, next_state).unwrap();
     }
 }
