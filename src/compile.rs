@@ -17,6 +17,7 @@ use simplicityhl::{Arguments, CompiledProgram, simplicity::jet};
 use crate::error::Error;
 
 const TEMPLATE_PATH: &str = "scripts/eltoo_commitment_template.simf";
+const FUNDING_TRANSACTION_TEMPLATE_PATH: &str = "scripts/funding_transaction.simf";
 
 /// Placeholder identifiers in the template file.
 const SETTLEMENT_KEY_A_PLACEHOLDER: &str = "__SETTLEMENT_KEY_A__";
@@ -44,6 +45,18 @@ pub(crate) fn build_new_commitment_script(
     );
 
     // Compile the `SimplicityHL` program from it's string.
+    let compiled = CompiledProgram::new(prog_text, Arguments::default(), false)
+        .map_err(simplicityhl::error::Error::CannotCompile)?;
+
+    Ok(compiled)
+}
+
+pub(crate) fn build_funding_transaction(
+    key1: SecretKey,
+    key2: SecretKey,
+) -> Result<CompiledProgram, Error> {
+    let prog_path = std::path::Path::new(FUNDING_TRANSACTION_TEMPLATE_PATH);
+    let prog_text = std::fs::read_to_string(prog_path).unwrap();
     let compiled = CompiledProgram::new(prog_text, Arguments::default(), false)
         .map_err(simplicityhl::error::Error::CannotCompile)?;
 
