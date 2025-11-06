@@ -77,14 +77,25 @@ fn format_pubkey(pubkey: XOnlyPublicKey) -> String {
     format!("0x{}", pubkey)
 }
 
-pub(crate) fn derive_settlement_key(update_key: &SecretKey, state: u64) -> [u8; 32] {
+pub(crate) fn derive_settlement_key(update_key: &SecretKey, state: u64) -> SecretKey {
     use sha256::Hash;
 
     let mut key_material = Vec::with_capacity(32 + 8);
     key_material.extend_from_slice(&update_key.secret_bytes());
     key_material.extend_from_slice(&state.to_be_bytes());
 
-    *Hash::hash(&key_material).as_ref()
+    let secret = Hash::hash(&key_material);
+
+    SecretKey::from_slice(secret.as_ref()).unwrap_or_else(|_| {
+        let mut attempt = key_material;
+        loop {
+            attempt.extend_from_slice("salt".as_bytes());
+            let hash = Hash::hash(&attempt);
+            if let Ok(key) = SecretKey::from_slice(hash.as_ref()) {
+                break key;
+            }
+        }
+    })
 }
 
 #[cfg(test)]
@@ -105,6 +116,7 @@ mod tests {
         let settlement_key_a = derive_settlement_key(&update_key_a, next_state);
         let settlement_key_b = derive_settlement_key(&update_key_b, next_state);
         let compiled =
-            create_new_commitment_script(&secp, update_key_a, update_key_b, next_state).unwrap();
+            create_new_commitment_script(&secp, settlement_key_a, settlement_key_b, next_state)
+                .unwrap();
     }
 }
