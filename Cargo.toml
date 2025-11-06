@@ -2,11 +2,11 @@
 name = "simpleltoo"
 version = "0.1.0"
 edition = "2024"
-autors = [
+authors = [
   "Luis Schwab <luisschwab@protonmail.com>",
   "Erick Cestari <erickcestari03@gmail.com>"
 ]
-licence = "MIT"
+license = "MIT"
 
 [dependencies]
 base64 = "0.22.1"
