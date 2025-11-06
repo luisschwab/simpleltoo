@@ -1,0 +1,101 @@
+/*
+ * ELTOO UPDATE/SETTLEMENT OUTPUT SCRIPT
+ *
+ * This script implements the eltoo layer-2 protocol output script with two paths:
+ * 1. Settlement path: Requires 10 block CSV delay + 2-of-2 multisig with settlement keys
+ * 2. Update path: Requires CLTV state number check + 2-of-2 multisig with update keys
+ *
+ * Based on: https://blockstream.com/eltoo.pdf (Figure 4)
+ */
+
+/*
+ * SIGHASH_ALL | SIGHASH_ANYPREVOUT.
+ */
+fn sighash_all_anyprevout() -> u256 {
+    let ctx: Ctx8 = jet::sha_256_ctx_8_init();
+    // Blockchain
+    let ctx: Ctx8 = jet::sha_256_ctx_8_add_32(ctx, jet::genesis_block_hash());
+    let ctx: Ctx8 = jet::sha_256_ctx_8_add_32(ctx, jet::genesis_block_hash());
+    // Transaction
+    let ctx: Ctx8 = jet::sha_256_ctx_8_add_4(ctx, jet::version());
+    let ctx: Ctx8 = jet::sha_256_ctx_8_add_4(ctx, jet::lock_time());
+    let ctx: Ctx8 = jet::sha_256_ctx_8_add_32(ctx, jet::tap_env_hash());
+    // Current input without outpoint
+    let ctx: Ctx8 = jet::sha_256_ctx_8_add_4(ctx, jet::current_sequence());
+    let ctx: Ctx8 = jet::annex_hash(ctx, jet::current_annex_hash());
+    let ctx: Ctx8 = jet::sha_256_ctx_8_add_32(ctx, unwrap(jet::input_utxo_hash(jet::current_index())));
+    // All outputs
+    let ctx: Ctx8 = jet::sha_256_ctx_8_add_32(ctx, jet::outputs_hash());
+    let ctx: Ctx8 = jet::sha_256_ctx_8_add_32(ctx, jet::issuances_hash());
+    let ctx: Ctx8 = jet::sha_256_ctx_8_add_32(ctx, jet::output_surjection_proofs_hash());
+    // No current index
+    // Message
+    jet::sha_256_ctx_8_finalize(ctx)
+}
+
+fn checksig(pk: Pubkey, sig: Signature) {
+    let msg: u256 = sighash_all_anyprevout();
+    jet::bip_0340_verify((pk, msg), sig);
+}
+
+fn check2of2multisig(pk1: Pubkey, pk2: Pubkey, sig1: Signature, sig2: Signature) {
+    checksig(pk1, sig1);
+    checksig(pk2, sig2);
+}
+
+fn check_csv_delay(required_blocks: u32) {
+    // Check that the spending transaction has the required CSV delay
+    let sequence: u32 = jet::current_sequence();
+    // CSV uses relative timelock encoding in sequence field
+    let (is_greater_or_equal, _): (bool, u32) = jet::subtract_32(sequence, required_blocks);
+    assert!(is_greater_or_equal);
+}
+
+fn check_cltv_state_number(required_state: u32) {
+    // Check that spending transaction's locktime >= required state number
+    let tx_locktime: u32 = jet::lock_time();
+    let (is_greater_or_equal, _): (bool, u32) = jet::subtract_32(tx_locktime, required_state);
+    assert!(is_greater_or_equal);
+}
+
+fn settlement_spend(settlement_sigs: (Signature, Signature)) {
+    let (sig_as_i, sig_bs_i): (Signature, Signature) = settlement_sigs;
+    
+    // Requires 10 block CSV delay
+    check_csv_delay(10);
+    
+    // Settlement keys for state i (derived from state number)
+    let as_i: Pubkey = __SETTLEMENT_KEY_A__; // Settlement key A for state i
+    let bs_i: Pubkey = __SETTLEMENT_KEY_B__; // Settlement key B for state i
+    
+    // Requires 2-of-2 multisig with settlement keys
+    check2of2multisig(as_i, bs_i, sig_as_i, sig_bs_i);
+}
+
+fn update_spend(update_sigs: (Signature, Signature)) {
+    let (sig_au, sig_bu): (Signature, Signature) = update_sigs;
+    
+    // State number: Si + 1
+    let next_state_number: u32 = __NEXT_STATE_NUMBER__;
+    
+    // Requires state number ordering via CLTV
+    check_cltv_state_number(next_state_number);
+    
+    // Update keys (same for all states)
+    let au: Pubkey = 0xf9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9; // Update key A
+    let bu: Pubkey = 0xe493dbf1c10d80f3581e4904930b1404cc6c13900ee0758474fa94abe8c4cd13; // Update key B
+    
+    // Requires 2-of-2 multisig with update keys
+    check2of2multisig(au, bu, sig_au, sig_bu);
+}
+
+fn main() {
+    match witness::SETTLEMENT_OR_UPDATE {
+        Left(settlement_sigs: (Signature, Signature)) => {
+            settlement_spend(settlement_sigs);
+        },
+        Right(update_sigs: (Signature, Signature)) => {
+            update_spend(update_sigs);
+        },
+    }
+}
