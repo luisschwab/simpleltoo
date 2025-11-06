@@ -1,12 +1,17 @@
 // TODO(@luisschwab): remove this
 #![allow(unused)]
 
+use std::str::FromStr;
+
 use elements::{
-    AssetId, OutPoint, Script, Transaction, TxOut, TxOutWitness, confidential,
+    AssetId, OutPoint, Script, Transaction, TxOut, TxOutWitness, Txid,
+    bitcoin::bip32::Xpriv,
+    confidential,
     hashes::sha256,
     pset::{Input, Output, PartiallySignedTransaction as Pset},
 };
-use lwk_wollet::secp256k1::SecretKey;
+use lwk_signer::SwSigner;
+use lwk_wollet::{elements_miniscript::psbt::PsbtExt, secp256k1::SecretKey};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -44,7 +49,9 @@ async fn main() {
     let address = compile::derive_address(&funding_script, false);
     info!("Funding address: {}", address);
 
-    let txid = faucet::get_coins(&address).await.unwrap();
+    //let txid = faucet::get_coins(&address).await.unwrap();
+    let txid =
+        Txid::from_str("8f918dce5094f7ff8da0e57c4d1abc6909b658419ee75e46aafbd83500ba90ac").unwrap();
 
     info!("Txid: {:?}", txid);
     let state = 0;
@@ -55,7 +62,7 @@ async fn main() {
             .unwrap();
     let address_trigger = compile::derive_address(&trigger_transaction_program, false);
     let mut pset = Pset::new_v2();
-    //let input = Input::from_prevout(OutPoint::new(txid, 0));
+    let input = Input::from_prevout(OutPoint::new(txid, 0));
     let txout = TxOut {
         asset: confidential::Asset::Explicit(LIQUID_TESTNET_BTC),
         value: confidential::Value::Explicit(100_000),
@@ -64,8 +71,12 @@ async fn main() {
         witness: TxOutWitness::empty(),
     };
     let output = Output::from_txout(txout);
-    //pset.add_input(input);
+    pset.add_input(input);
     pset.add_output(output);
 
-    info!("Pset: {:?}", pset);
+    // info!("Pset: {:?}", pset);
+    // info!("Pset sanity check: {:?}", pset.sanity_check());
+    let transaction = pset.extract_tx().unwrap();
+
+    info!("Transaction: {:?}", transaction);
 }
