@@ -14,7 +14,7 @@ build:
 # Check code: formatting, compilation, linting, and commit signature
 check:
     cargo +nightly fmt --all -- --check
-    cargo check --workspace
+    cargo check
     cargo clippy -- -D warnings
 
 # Delete files: example, target, lockfile
