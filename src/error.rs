@@ -8,4 +8,8 @@ pub(crate) enum Error {
 
     #[error("Esplora error: {0}")]
     Esplora(#[from] lwk_wollet::Error),
+    #[error("Simplicity error: {0}")]
+    Simplicity(#[from] simplicityhl::error::Error),
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
 }

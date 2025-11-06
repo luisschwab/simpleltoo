@@ -3,6 +3,7 @@
 
 use tracing_subscriber::EnvFilter;
 
+mod compile;
 mod error;
 mod esplora;
 mod faucet;
