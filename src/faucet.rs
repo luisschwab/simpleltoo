@@ -4,7 +4,7 @@ use tracing::info;
 
 use crate::error::Error;
 
-/// L-BTC TestnetV1 faucet URL.
+/// Blockstream's L-BTC TestnetV1 faucet.
 pub(crate) const FAUCET_URL: &str =
     "https://liquidtestnet.com/faucet?address=<PLACEHOLDER>&action=lbtc";
 
