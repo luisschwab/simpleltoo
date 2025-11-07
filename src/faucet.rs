@@ -1,9 +1,11 @@
+#![allow(unused)]
+
 use std::str::FromStr;
 
 use bitreq::Response;
 use elements::{Address, Txid};
 use regex::Regex;
-use tracing::{debug, info};
+use tracing::info;
 
 use crate::error::Error;
 
@@ -12,7 +14,7 @@ pub(crate) const FAUCET_URL: &str =
     "https://liquidtestnet.com/faucet?address=<PLACEHOLDER>&action=lbtc";
 
 /// Request L-BTC TestnetV1 coins to an [`Address`].
-pub(crate) async fn get_coins(address: &Address) -> Result<Txid, Error> {
+pub(crate) async fn get_testnet_coins(address: &Address) -> Result<Txid, Error> {
     let url: String = FAUCET_URL.replace("<PLACEHOLDER>", &address.to_string());
 
     info!("Requesting L-BTC coin from faucet: {}", url);
@@ -44,15 +46,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_coins() {
-        tracing_subscriber::fmt()
-            .with_max_level(tracing::Level::DEBUG)
-            .init();
+        tracing_subscriber::fmt().init();
 
         let address: Address = "tex1p53ct8hcvnr7zznfjawxwetycthxyv6c06vh4dk2zymc3c3laps5q94kptw"
             .parse::<Address>()
             .unwrap();
 
-        let txid = get_coins(&address).await.unwrap();
+        let txid = get_testnet_coins(&address).await.unwrap();
 
         info!("Funding Txid: {}", txid);
     }
