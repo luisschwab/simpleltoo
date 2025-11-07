@@ -1,11 +1,7 @@
-use std::collections::HashMap;
+#![allow(unused)]
 
-use elements::bitcoin::Amount;
-use elements::{Address, Transaction, Txid};
-use lwk_wollet::{
-    ElementsNetwork,
-    clients::asyncr::{EsploraClient as AsyncClient, EsploraClientBuilder as Builder},
-};
+use elements::{Transaction, Txid};
+use lwk_wollet::{ElementsNetwork, clients::asyncr::EsploraClient as AsyncClient};
 
 pub(crate) const LIQUIDV1_MAIN_URL: &str = "https://liquid.network/api/";
 pub(crate) const LIQUIDV1_TEST_URL: &str = "https://liquid.network/liquidtestnet/api/";
@@ -39,9 +35,7 @@ pub(crate) async fn get_transactions(
 mod tests {
     use std::sync::LazyLock;
 
-    use elements::bitcoin::Network;
-
-    use super::*;
+    use elements::Address;
 
     static LIQUID_V1_ADDR: LazyLock<Address> = LazyLock::new(|| {
         "Go65t19hP2FuhBMYtgbdMDgdmEzNwh1i48"
