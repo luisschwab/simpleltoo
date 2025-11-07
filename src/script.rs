@@ -1,20 +1,18 @@
-use std::fmt::format;
+#![allow(unused)]
 
 use base64::{display::Base64Display, engine::general_purpose::STANDARD};
+use elements::opcodes::all::{OP_CHECKSIG, OP_CHECKSIGVERIFY};
+use elements::script::Builder;
+use elements::secp256k1_zkp::{self, SecretKey, XOnlyPublicKey};
 use elements::{
-    hashes::{Hash, sha256},
     secp256k1_zkp::SECP256K1,
     {Address, AddressParams, Script},
 };
-use hal_simplicity::{
-    Network,
-    hal_simplicity::{Program, elements_address},
-    simplicity::Cmr,
-};
-use lwk_wollet::secp256k1::{self, SecretKey, XOnlyPublicKey};
+use hal_simplicity::hal_simplicity::{Program, elements_address};
 use simplicityhl::{Arguments, CompiledProgram, simplicity::jet};
 
 use crate::error::Error;
+use crate::sign::{derive_settlement_key, prefix_pubkey};
 
 const TEMPLATE_PATH: &str = "scripts/eltoo_commitment_template.simf";
 const FUNDING_TRANSACTION_TEMPLATE_PATH: &str = "scripts/funding_transaction.simf";
@@ -24,6 +22,19 @@ const SETTLEMENT_KEY_A_PLACEHOLDER: &str = "__SETTLEMENT_KEY_A__";
 const SETTLEMENT_KEY_B_PLACEHOLDER: &str = "__SETTLEMENT_KEY_B__";
 const STATE_NUMBER_PLACEHOLDER: &str = "__NEXT_STATE_NUMBER__";
 
+/// Build the Witness Program for the 2-of2 setup address between Alice and Bob.
+pub(crate) fn build_setup_address_program(
+    alice_update_pk: &XOnlyPublicKey,
+    bob_update_pk: &XOnlyPublicKey,
+) -> Script {
+    Builder::new()
+        .push_slice(&alice_update_pk.serialize())
+        .push_opcode(OP_CHECKSIGVERIFY)
+        .push_slice(&bob_update_pk.serialize())
+        .push_opcode(OP_CHECKSIG)
+        .into_script()
+}
+
 /// Build the `ELTOO` commitment script from both parties settlement [`SecretKey`]s.
 pub(crate) fn build_new_commitment_script(
     settlement_key_a: SecretKey,
@@ -31,7 +42,7 @@ pub(crate) fn build_new_commitment_script(
     next_state: u64,
 ) -> Result<CompiledProgram, Error> {
     let prog_path = std::path::Path::new(TEMPLATE_PATH);
-    let mut template = std::fs::read_to_string(prog_path)?;
+    let template = std::fs::read_to_string(prog_path)?;
 
     let pub_settlement_key_a = settlement_key_a.x_only_public_key(SECP256K1);
     let pub_settlement_key_b = settlement_key_b.x_only_public_key(SECP256K1);
@@ -86,36 +97,9 @@ fn populate_template(
     state: u64,
 ) -> String {
     template
-        .replace(SETTLEMENT_KEY_A_PLACEHOLDER, &format_pubkey(pub_key_a))
-        .replace(SETTLEMENT_KEY_B_PLACEHOLDER, &format_pubkey(pub_key_b))
+        .replace(SETTLEMENT_KEY_A_PLACEHOLDER, &prefix_pubkey(pub_key_a))
+        .replace(SETTLEMENT_KEY_B_PLACEHOLDER, &prefix_pubkey(pub_key_b))
         .replace(STATE_NUMBER_PLACEHOLDER, &state.to_string())
-}
-
-/// Add the `0x` prefix to an [`XOnlyPublicKey`].
-fn format_pubkey(pubkey: XOnlyPublicKey) -> String {
-    format!("0x{}", pubkey)
-}
-
-/// Derive the settlement key from an update key and the state index.
-pub(crate) fn derive_settlement_key(update_key: &SecretKey, state: u64) -> SecretKey {
-    use sha256::Hash;
-
-    let mut key_material = Vec::with_capacity(32 + 8);
-    key_material.extend_from_slice(&update_key.secret_bytes());
-    key_material.extend_from_slice(&state.to_be_bytes());
-
-    let secret = Hash::hash(&key_material);
-
-    SecretKey::from_slice(secret.as_ref()).unwrap_or_else(|_| {
-        let mut attempt = key_material;
-        loop {
-            attempt.extend_from_slice("salt".as_bytes());
-            let hash = Hash::hash(&attempt);
-            if let Ok(key) = SecretKey::from_slice(hash.as_ref()) {
-                break key;
-            }
-        }
-    })
 }
 
 #[cfg(test)]
