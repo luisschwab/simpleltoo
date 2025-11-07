@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use thiserror::Error;
 
 /// Unified error variants.

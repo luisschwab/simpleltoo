@@ -2,6 +2,7 @@ alias b := build
 alias c := check
 alias d := delete
 alias f := fmt
+alias r := run
 alias t := test
 
 _default:
@@ -24,6 +25,9 @@ delete item="examples":
 # Format code
 fmt:
     cargo +nightly fmt
+
+run:
+    cargo run
 
 test:
     cargo test
